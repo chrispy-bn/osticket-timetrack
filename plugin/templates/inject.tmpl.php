@@ -25,6 +25,7 @@ $tt_json = JsonDataEncoder::encode(array(
         'required'  => tt__('Enter the time spent before posting.'),
         'invalid'   => tt__('That time is not readable. Try 90, 1:30 or 1h30.'),
         'hint'      => tt__('minutes — or 1:30 / 1h30'),
+        'edit'      => tt__('Edit time'),
     ),
 ));
 
@@ -97,20 +98,54 @@ $(function() {
     });
 
     // --- What is already logged, next to each thread entry author ---
+
+    // --- Display logged time and edit button ---
     $.each(TT.entries, function(entryId, rec) {
         var $anchor = $('a[name="entry-' + entryId + '"]');
         if (!$anchor.length) return;
 
         $anchor.closest('div').find('.tt-badge').remove();
-        $('<span>')
+
+        var $badge = $('<span>')
             .addClass('label label-bare tt-badge')
             .css('margin-left', '6px')
-            .attr('title', rec.type + (rec.billable ? ' — ' + TT.labels.billable : ''))
-            .attr('data-toggle', 'tooltip')
+            .attr('title', rec.type + (rec.billable
+                ? ' — ' + TT.labels.billable : ''))
             .html('<i class="icon-time"></i> ' + rec.pretty
-                + (rec.billable ? ' <i class="icon-dollar"></i>' : ''))
-            .insertAfter($anchor);
+                + (rec.billable
+                    ? ' <i class="icon-dollar"></i>' : ''));
+
+        // Only show edit action when permitted
+        if (rec.canEdit) {
+            var $edit = $('<a>')
+                .attr('href', '#')
+                .attr('title', TT.labels.edit)
+                .attr('aria-label', TT.labels.edit)
+                .addClass('tt-edit')
+                .css({
+                    'margin-left': '8px',
+                    'cursor': 'pointer'
+                })
+                .html('<i class="icon-pencil"></i>')
+                .on('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    $.dialog(
+                        'ajax.php/timetrack/entry/' + rec.id,
+                        201,
+                        function() {
+                            window.location.reload();
+                        }
+                    );
+                });
+
+            $badge.append(' ').append($edit);
+        }
+
+        $badge.insertAfter($anchor);
     });
+
 
     // --- Total, as one more row of the ticket summary ---
     if (TT.has) {
