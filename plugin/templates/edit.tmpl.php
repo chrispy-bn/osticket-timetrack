@@ -6,7 +6,6 @@
  * Time Tracking plugin for osTicket — GNU GPL v2
  */
 if (!$thisstaff) die('Access Denied');
-#$action = ROOT_PATH . 'scp/ajax.php/timetrack/entry/' . $rec->id;
 $action = '#timetrack/entry/' . (int) $rec->id;
 ?>
 <h3 class="drag-handle"><?php echo tt__('Edit time'); ?></h3>
@@ -39,7 +38,6 @@ $action = '#timetrack/entry/' . (int) $rec->id;
                     </select>
                 </td>
             </tr>
-            <?php if ($can_billable): ?>
             <tr>
                 <td width="120"><label><strong><?php echo tt__('Billable'); ?>:</strong></label></td>
                 <td>
@@ -48,7 +46,6 @@ $action = '#timetrack/entry/' . (int) $rec->id;
                         <?php echo tt__('Count towards billing'); ?></label>
                 </td>
             </tr>
-            <?php endif; ?>
         </tbody>
     </table>
     <hr>

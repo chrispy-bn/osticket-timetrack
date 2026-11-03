@@ -10,6 +10,9 @@
  *
  * Time Tracking plugin for osTicket — GNU GPL v2
  */
+
+global $thisstaff;
+
 $tt_json = JsonDataEncoder::encode(array(
     'entries'  => $data,
     'total'    => TimeTrackEntry::formatMinutes($totals['total']),
@@ -17,6 +20,7 @@ $tt_json = JsonDataEncoder::encode(array(
     'has'      => (bool) $totals['total'],
     'required' => $required,
     'notesBillable' => $notes_billable,
+    'canShowEdit' => (bool) ($thisstaff && $thisstaff->isAdmin()),
     'labels'   => array(
         'time'      => tt__('Time'),
         'billable'  => tt__('Billable'),
@@ -99,7 +103,7 @@ $(function() {
 
     // --- What is already logged, next to each thread entry author ---
 
-    // --- Display logged time and edit button ---
+    // --- Time badges and edit dialog test ---
     $.each(TT.entries, function(entryId, rec) {
         var $anchor = $('a[name="entry-' + entryId + '"]');
         if (!$anchor.length) return;
@@ -115,16 +119,16 @@ $(function() {
                 + (rec.billable
                     ? ' <i class="icon-dollar"></i>' : ''));
 
-        // Only show edit action when permitted
-        if (rec.canEdit) {
-            var $edit = $('<a>')
-                .attr('href', '#')
-                .attr('title', TT.labels.edit)
-                .attr('aria-label', TT.labels.edit)
-                .addClass('tt-edit')
+        if (TT.canShowEdit && rec.id) {
+            $('<a>')
+                .attr({
+                    href: '#',
+                    title: TT.labels.edit,
+                    'aria-label': TT.labels.edit
+                })
                 .css({
-                    'margin-left': '8px',
-                    'cursor': 'pointer'
+                    marginLeft: '8px',
+                    cursor: 'pointer'
                 })
                 .html('<i class="icon-pencil"></i>')
                 .on('click', function(e) {
@@ -138,9 +142,8 @@ $(function() {
                             window.location.reload();
                         }
                     );
-                });
-
-            $badge.append(' ').append($edit);
+                })
+                .appendTo($badge);
         }
 
         $badge.insertAfter($anchor);

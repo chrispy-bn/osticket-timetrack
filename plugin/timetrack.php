@@ -193,18 +193,14 @@ class TimeTrackPlugin extends Plugin {
        =============================================================== */
 
     function injectUI($ticket) {
-        global $cfg, $thisstaff;
+        global $cfg;
 
         $config   = $this->getConfig();
         $types    = $this->getTypes();
         $billable = (bool) $config->get('billable_default');
         $required = (bool) $config->get('required');
         $notes_billable = (bool) $config->get('notes_billable');
-        $threadEntry = ThreadEntry::lookup((int) $rec->thread_entry_id);
-            if (!$threadEntry)
-                Http::response(404, tt__('No such time entry'));
 
-$can_billable = $notes_billable || $threadEntry->type !== 'N';
         $entries = TimeTrackEntry::forTicket($ticket->getId());
         $totals  = TimeTrackEntry::totalsForTicket($ticket->getId());
 
@@ -215,8 +211,6 @@ $can_billable = $notes_billable || $threadEntry->type !== 'N';
                 'pretty'   => $r->getPretty(),
                 'type'     => $r->getType(),
                 'billable' => $r->isBillable() ? 1 : 0,
-                'canEdit'  => $this->canEditTimeEntry(
-                    $r, $thisstaff, $ticket),
             );
 
         include 'templates/inject.tmpl.php';
@@ -412,23 +406,6 @@ $can_billable = $notes_billable || $threadEntry->type !== 'N';
        Editing
        =============================================================== */
 
-   function canEditTimeEntry($rec, $staff, $ticket = null) {
-    if (!$rec || !$staff)
-        return false;
-
-    if (!$ticket)
-        $ticket = Ticket::lookup((int) $rec->ticket_id);
-
-    if (!$ticket
-            || (int) $ticket->getId() !== (int) $rec->ticket_id
-            || !$ticket->checkStaffPerm($staff))
-        return false;
-
-    return $staff->isAdmin()
-        || (int) $rec->staff_id === (int) $staff->getId()
-        || $ticket->checkStaffPerm($staff, Ticket::PERM_EDIT);
-        }    
-
     function editDialog($id) {
         global $ost, $cfg, $thisstaff;
         if (!$thisstaff)
@@ -437,8 +414,12 @@ $can_billable = $notes_billable || $threadEntry->type !== 'N';
         $rec = TimeTrackEntry::lookup((int) $id);
         if (!$rec)
             Http::response(404, tt__('No such time entry'));
+        // Only administrators with access to this ticket may edit time.
+        $ticket = $rec->getTicket();
 
-        if (!$this->canEditTimeEntry($rec, $thisstaff))
+        if (!$thisstaff->isAdmin()
+                || !$ticket
+                || !$ticket->checkStaffPerm($thisstaff))
             Http::response(403, tt__('Access denied'));
 
         $types = $this->getTypes();
@@ -457,11 +438,16 @@ $can_billable = $notes_billable || $threadEntry->type !== 'N';
         if (!$rec)
             Http::response(404, tt__('No such time entry'));
 
-        if (!$this->canEditTimeEntry($rec, $thisstaff))
+        // Only administrators with access to this ticket may edit time.
+        $ticket = $rec->getTicket();
+
+        if (!$thisstaff->isAdmin()
+                || !$ticket
+                || !$ticket->checkStaffPerm($thisstaff))
             Http::response(403, tt__('Access denied'));
 
         $minutes = TimeTrackEntry::parseMinutes($_POST['tt_minutes'] ?? '');
-        if ($minutes === false || $minutes === null)
+        if (!is_int($minutes) || $minutes <= 0)
             Http::response(422, tt__('Invalid time'));
 
         $types = $this->getTypes();
@@ -470,14 +456,16 @@ $can_billable = $notes_billable || $threadEntry->type !== 'N';
         $rec->minutes  = TimeTrackEntry::roundUp($minutes, $this->getConfig()->get('rounding'));
         $rec->type     = in_array($type, $types) ? $type : $types[0];
         $threadEntry = ThreadEntry::lookup((int) $rec->thread_entry_id);
-            if (!$threadEntry)
-                Http::response(404, tt__('No such time entry'));
 
-        $can_billable = $this->getConfig()->get('notes_billable')
-            || $threadEntry->type !== 'N';
+        if (!$threadEntry)
+            Http::response(404, tt__('No such time entry'));
 
-        $rec->billable = ($can_billable && !empty($_POST['tt_billable']))
-            ? 1 : 0;
+        $notesBillable = (bool) $this->getConfig()->get('notes_billable');
+
+        $rec->billable = (
+                ($threadEntry->type !== 'N' || $notesBillable)
+                    && !empty($_POST['tt_billable'])
+        ) ? 1 : 0;
         $rec->updated  = SqlFunction::NOW();
         $rec->save();
 
